@@ -33,7 +33,7 @@ Pipeline run used for the live demo: [Actions run #5](https://github.com/anushka
 | Criterion | Evidence |
 |---|---|
 | Public repo | https://github.com/anushkabhansalii/apoointment-booking-devops-project |
-| Meaningful commits (≥10) | [m3-commit-history.png](screenshots/m3-commit-history.png) · `git log` (40+ commits) |
+| Meaningful commits (≥10) | [m3-commit-history.png](screenshots/m3-commit-history.png) · `git log` (40+ commits, plus the pipeline bot's promote commits) |
 | `.gitignore` | `.gitignore` — `.env`, `__pycache__`, `node_modules`, `.venv`, Terraform state, `*.tfvars` |
 
 ## M4 — Docker
@@ -44,7 +44,7 @@ Pipeline run used for the live demo: [Actions run #5](https://github.com/anushka
 | Frontend multi-stage (Node → Nginx) | `frontend/Dockerfile` (`node:20-alpine` → `nginx-unprivileged`) |
 | Non-root | backend `USER 10001`, frontend UID 101; enforced in K8s by Pod Security *restricted* |
 | `docker compose up --build` starts 3 services | [m4-docker-compose-up.png](screenshots/m4-docker-compose-up.png) |
-| App at `localhost:3000` | [m1-dashboard.png](screenshots/m1-dashboard.png) |
+| App at `localhost:3000` | [m4-browser-localhost-3000.png](screenshots/m4-browser-localhost-3000.png) |
 
 ## M5 — CI/CD
 
@@ -103,7 +103,7 @@ Ingress rules (`http://slotsync.localhost:8080` → ingress-nginx → `/` fronte
 | Criterion | Evidence |
 |---|---|
 | `/metrics` in Prometheus format | [m9-metrics-endpoint.png](screenshots/m9-metrics-endpoint.png) |
-| Prometheus scraping the app | [m9-prometheus-targets.png](screenshots/m9-prometheus-targets.png), [m9-prometheus-all-targets.png](screenshots/m9-prometheus-all-targets.png) |
+| Prometheus scraping the app | [m9-prometheus-targets.png](screenshots/m9-prometheus-targets.png) (8/8 backend pods UP), [m9-prometheus-all-targets.png](screenshots/m9-prometheus-all-targets.png) |
 | Grafana accessible + live panel | [m9-grafana-dashboard.png](screenshots/m9-grafana-dashboard.png) |
 | Values files | `monitoring/kube-prometheus-stack-values.yaml` |
 
