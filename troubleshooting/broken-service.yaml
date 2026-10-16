@@ -1,0 +1,41 @@
+# LAB 2 - Service with no endpoints
+# The Service selector says component=api but the pods are labelled component=web.
+#   kubectl apply -f troubleshooting/broken-service.yaml
+#   kubectl get endpoints -n slotsync-lab web          -> <none>
+#   kubectl get pods -n slotsync-lab --show-labels     -> compare labels with the selector
+#   kubectl run tmp -n slotsync-lab --rm -it --image=busybox:1.37 --restart=Never -- wget -T3 -qO- http://web
+#       -> times out
+# Fix: kubectl -n slotsync-lab patch svc web -p '{"spec":{"selector":{"app":"web","component":"web"}}}'
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: slotsync-lab
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: slotsync-lab
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: web, component: web }
+  template:
+    metadata:
+      labels: { app: web, component: web }
+    spec:
+      containers:
+        - name: nginx
+          image: nginxinc/nginx-unprivileged:1.29-alpine
+          ports: [{ containerPort: 8080 }]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: slotsync-lab
+spec:
+  selector: { app: web, component: api }   # <-- bug: no pod has component=api
+  ports:
+    - port: 80
+      targetPort: 8080

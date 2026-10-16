@@ -1,0 +1,43 @@
+# Synthetic traffic to demonstrate the HPA and populate Grafana.
+#   kubectl apply -f scripts/load-generator.yaml
+#   kubectl get hpa -n slotsync -w
+#   kubectl delete -f scripts/load-generator.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: slotsync-load-generator
+  namespace: slotsync
+  labels: { app: slotsync-load-generator }
+spec:
+  replicas: 4
+  selector:
+    matchLabels: { app: slotsync-load-generator }
+  template:
+    metadata:
+      labels: { app: slotsync-load-generator }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: load
+          image: busybox:1.37
+          command: ["sh", "-c"]
+          # Mix of list, stats (CPU-heavy), lookups and an occasional 404.
+          args:
+            - |
+              B=http://slotsync-backend:8000
+              while true; do
+                wget -qO- $B/api/appointments/stats >/dev/null
+                wget -qO- $B/api/appointments >/dev/null
+                wget -qO- "$B/api/appointments?status=confirmed" >/dev/null
+                wget -qO- $B/api/providers >/dev/null
+                wget -qO- $B/api/appointments/999999 >/dev/null 2>&1 || true
+              done
+          resources:
+            requests: { cpu: 20m, memory: 16Mi }
+            limits: { cpu: 200m, memory: 32Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }

@@ -1,0 +1,29 @@
+# LAB 1 - ImagePullBackOff
+# A typo in the image tag. The Deployment is accepted, but the pod never starts.
+#   kubectl apply -f troubleshooting/broken-image.yaml
+#   kubectl get pods -n slotsync-lab                  -> ErrImagePull / ImagePullBackOff
+#   kubectl describe pod -n slotsync-lab -l app=broken-image   -> Events: "manifest unknown"
+# Fix: point at a tag that exists (the Git SHA CI pushed), e.g.
+#   kubectl -n slotsync-lab set image deploy/broken-image api=ghcr.io/anushkabhansalii/slotsync-backend:<sha>
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: slotsync-lab
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: broken-image
+  namespace: slotsync-lab
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: broken-image }
+  template:
+    metadata:
+      labels: { app: broken-image }
+    spec:
+      containers:
+        - name: api
+          image: ghcr.io/anushkabhansalii/slotsync-backend:v9.9.9-does-not-exist
+          ports: [{ containerPort: 8000 }]

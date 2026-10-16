@@ -1,0 +1,42 @@
+# LAB 3 - Running but not Ready
+# The API process is alive (/health = 200) but cannot reach its database, so
+# /ready returns 503: the pod shows 0/1 READY and receives no traffic.
+#   kubectl apply -f troubleshooting/broken-readiness.yaml
+#   kubectl get pods -n slotsync-lab -l app=not-ready   -> Running, READY 0/1
+#   kubectl describe pod -n slotsync-lab -l app=not-ready
+#       -> "Readiness probe failed: HTTP probe failed with statuscode: 503"
+#   kubectl logs -n slotsync-lab deploy/not-ready
+# Fix: correct DATABASE_URL (or the NetworkPolicy blocking it) and the pod turns Ready
+# without a restart - readiness never kills a pod, liveness does.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: slotsync-lab
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: not-ready
+  namespace: slotsync-lab
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: not-ready }
+  template:
+    metadata:
+      labels: { app: not-ready }
+    spec:
+      containers:
+        - name: api
+          image: ghcr.io/anushkabhansalii/slotsync-backend:REPLACE_WITH_SHA
+          env:
+            - name: RUN_MIGRATIONS
+              value: "false"
+            - name: DATABASE_URL     # bug: host does not exist
+              value: postgresql+psycopg://slotsync:x@postgres-typo.slotsync.svc:5432/slotsync
+          ports: [{ name: http, containerPort: 8000 }]
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+          readinessProbe:
+            httpGet: { path: /ready, port: http }
+            periodSeconds: 5
