@@ -17,7 +17,7 @@ def utcnow() -> datetime:
     return datetime.now(UTC)
 
 
-class AppointmentStatus(str, enum.Enum):
+class AppointmentStatus(enum.StrEnum):
     scheduled = "scheduled"
     confirmed = "confirmed"
     completed = "completed"

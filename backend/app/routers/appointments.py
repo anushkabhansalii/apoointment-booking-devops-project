@@ -42,7 +42,7 @@ def _get_or_404(db: Session, appointment_id: int) -> Appointment:
 def _check_provider(db: Session, provider_id: int) -> Provider:
     provider = db.get(Provider, provider_id)
     if provider is None or not provider.active:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Provider does not exist or is inactive")
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Provider does not exist or is inactive")
     return provider
 
 
@@ -53,7 +53,7 @@ def _check_opening_hours(start: datetime, duration: int) -> None:
     closes = local_start.replace(hour=settings.closing_hour, minute=0, second=0, microsecond=0)
     if local_start < opens or local_end > closes:
         raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
             f"Appointments must fit between {settings.opening_hour:02d}:00 and "
             f"{settings.closing_hour:02d}:00 studio time",
         )
@@ -102,7 +102,7 @@ def list_appointments(
         try:
             parsed = datetime.strptime(day, "%Y-%m-%d").date()
         except ValueError as exc:
-            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "day must be YYYY-MM-DD") from exc
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "day must be YYYY-MM-DD") from exc
         start, end = _studio_day_bounds(parsed)
         query = query.where(Appointment.start_time >= start, Appointment.start_time < end)
     if search:

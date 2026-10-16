@@ -7,7 +7,10 @@ RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 COPY requirements.txt .
-RUN pip install --upgrade pip setuptools wheel && pip install -r requirements.txt
+RUN pip install -r requirements.txt \
+ # The app never installs anything at runtime, so pip and its vendored
+ # libraries (urllib3, msgpack...) are only attack surface: remove them.
+ && pip uninstall -y setuptools wheel 2>/dev/null; python -m pip uninstall -y pip
 
 # ---------- runtime stage: slim image with only the venv and the app ----------
 FROM python:3.12-slim-bookworm AS runtime
@@ -23,12 +26,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PATH="/opt/venv/bin:$PATH" \
     APP_VERSION=${APP_VERSION}
 
-# Pick up Debian security fixes, then drop pip/setuptools from the system
-# Python: the app runs from /opt/venv and never needs them at runtime.
+# Pick up Debian security fixes, then drop pip from the system Python too:
+# the app runs from /opt/venv and never needs it.
 RUN apt-get update \
  && apt-get upgrade -y --no-install-recommends \
  && rm -rf /var/lib/apt/lists/* \
- && pip uninstall -y pip setuptools wheel 2>/dev/null || true
+ && (python -m pip uninstall -y pip setuptools wheel 2>/dev/null || true) \
+ && rm -rf /usr/local/lib/python3.12/ensurepip
 
 # Unprivileged user with a fixed UID so Kubernetes runAsNonRoot can verify it.
 RUN groupadd --system --gid 10001 app \
