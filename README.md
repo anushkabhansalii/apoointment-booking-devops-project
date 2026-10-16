@@ -12,7 +12,7 @@ is tested, scanned for secrets and CVEs, packaged as SHA-tagged images, publishe
 through Git, and rolled out by Argo CD to an EKS cluster that Terraform built — with Prometheus and
 Grafana watching it.
 
-> **Demo:** [`demo/presentation.mp4`](demo/presentation.mp4) (video walkthrough) · [`demo/SlotSync-DevOps-Capstone.pptx`](demo/SlotSync-DevOps-Capstone.pptx) (slides) · [`docs/EVIDENCE.md`](docs/EVIDENCE.md) (screenshots for every rubric item)
+> **Demo:** [`demo/presentation.mp4`](demo/presentation.mp4) (slides + live walkthrough on EKS) · [`demo/SlotSync-DevOps-Capstone.pptx`](demo/SlotSync-DevOps-Capstone.pptx) / [`.pdf`](demo/SlotSync-DevOps-Capstone.pdf) (slides) · [`docs/EVIDENCE.md`](docs/EVIDENCE.md) (screenshots for every rubric item)
 
 ---
 
@@ -49,7 +49,7 @@ flowchart LR
 
     subgraph CI["GitHub Actions"]
       direction TB
-      t1[Gitleaks<br/>secret scan] & t2[Ruff + pytest<br/>32 tests] & t3[Alembic on<br/>real Postgres] & t4[React build<br/>+ ESLint] & t5[helm lint<br/>terraform validate]
+      t1[Gitleaks<br/>secret scan] & t2[Ruff + pytest<br/>33 tests] & t3[Alembic on<br/>real Postgres] & t4[React build<br/>+ ESLint] & t5[helm lint<br/>terraform validate]
       t1 & t2 & t3 & t4 & t5 --> b[docker build<br/>backend + frontend]
       b --> s{Trivy<br/>HIGH/CRITICAL?}
       s -- clean --> p[push to GHCR<br/>tag = commit SHA]
@@ -164,6 +164,7 @@ Swagger UI: `/docs` · OpenAPI: `/openapi.json`
 | GET | `/api/appointments/stats` | KPIs: today, upcoming, by status/service/provider, completion & cancellation rate, revenue, next booking |
 | GET | `/api/providers` | Active practitioners |
 | GET | `/api/services` | Service menu with duration and price |
+| GET | `/api/version` | Git SHA the API image was built from (shown in the UI sidebar next to the UI's own SHA) |
 
 ### Database
 
@@ -236,7 +237,7 @@ cd backend
 pytest -v
 ```
 
-* **32 tests** across every endpoint: CRUD, validation (parametrised bad payloads), opening hours,
+* **33 tests** across every endpoint: CRUD, validation (parametrised bad payloads), opening hours,
   double-booking and back-to-back rules, cancelled-slot reuse, filters, stats maths, `/health`, `/ready`,
   `/metrics` content, OpenAPI routes and the wait-for-DB helper.
 * **Isolation:** `tests/conftest.py` sets `DATABASE_URL` to SQLite in-memory *before* the app is imported and
@@ -364,6 +365,16 @@ scripts/install-platform.sh eks
 #   Argo CD in "argocd"
 ```
 
+> **New AWS accounts:** if `kubectl -n ingress-nginx describe svc ingress-nginx-controller` shows
+> `OperationNotPermitted: This AWS account currently does not support creating load balancers`, run the controller
+> as ClusterIP and reach it through a port-forward (traffic still goes through the Ingress rules):
+>
+> ```bash
+> helm upgrade ingress-nginx ingress-nginx/ingress-nginx -n ingress-nginx \
+>   -f monitoring/ingress-nginx-values.yaml --set controller.service.type=ClusterIP
+> kubectl -n ingress-nginx port-forward svc/ingress-nginx-controller 8080:80   # http://slotsync.localhost:8080
+> ```
+
 ### Deploy with Helm directly
 
 ```bash
@@ -388,6 +399,10 @@ helm list -n slotsync
 | Secret / ConfigMap | random DB password kept across upgrades (`lookup`), or an existing Secret (GitOps) |
 | ServiceMonitor, PrometheusRule, dashboard ConfigMap | scraping, alerts, Grafana dashboard |
 | `helm test` pod | checks `/ready`, the frontend, and the frontend → backend proxy path |
+
+In the live EKS demo the `slotsync` namespace is managed by Argo CD (which renders the chart itself), and the same
+chart was additionally installed with `helm upgrade --install` as release `slotsync` in namespace `slotsync-helm`
+to show the Helm CLI workflow (`helm list`, `helm test`).
 
 Values files: `values.yaml` (defaults) · `values-dev.yaml` (minikube, local images, host `slotsync.local`) ·
 `values-eks.yaml` (gp3, monitoring on) · `values-gitops.yaml` (image SHA, written by CI).
@@ -474,6 +489,9 @@ NAT gateway, NLB) — a few dollars for a full demo session.
 * **PostgreSQL runs in the cluster** (StatefulSet, single replica) to keep the demo self-contained. Production
   should use Amazon RDS (Multi-AZ, automated backups, PITR) — the chart supports `postgres.enabled=false` +
   `database.externalUrl`.
+* **No public load balancer in the demo.** The EKS demo ran on a brand-new AWS account that AWS does not yet allow
+  to create load balancers, so the app was reached through `kubectl port-forward` to ingress-nginx instead of the NLB
+  hostname. The NLB configuration is in `monitoring/ingress-nginx-values.yaml` and works on an established account.
 * **No TLS / DNS.** The app is served over plain HTTP on the NLB hostname. Production would add a Route 53 record,
   cert-manager or ACM, and HTTPS redirects.
 * **No authentication** on the booking UI/API; it assumes a trusted front-desk network. Adding OIDC (e.g. Cognito)
@@ -484,3 +502,8 @@ NAT gateway, NLB) — a few dollars for a full demo session.
   setting.
 * Metrics and HPA react to CPU only; request-rate–based autoscaling (KEDA / Prometheus adapter) would track load
   more directly.
+
+---
+
+*The demo video's narration is synthesized (macOS text-to-speech) over real recordings of this project running;
+[`demo/VIDEO-SCRIPT.md`](demo/VIDEO-SCRIPT.md) has the script and shot list for re-recording it live.*
