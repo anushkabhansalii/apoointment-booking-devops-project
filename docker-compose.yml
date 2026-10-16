@@ -1,0 +1,54 @@
+# Full local stack: PostgreSQL + FastAPI + React/Nginx.
+#   docker compose up --build   ->  http://localhost:3000
+name: slotsync
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: slotsync
+      POSTGRES_USER: slotsync
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-slotsync}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U slotsync -d slotsync"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      args:
+        APP_VERSION: local
+    environment:
+      DATABASE_URL: postgresql+psycopg://slotsync:${POSTGRES_PASSWORD:-slotsync}@postgres:5432/slotsync
+      APP_ENV: docker-compose
+      CORS_ORIGINS: http://localhost:3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        APP_VERSION: local
+    environment:
+      BACKEND_URL: http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "3000:8080"
+    restart: unless-stopped
+
+volumes:
+  pgdata:
