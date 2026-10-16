@@ -15,7 +15,7 @@ export default function Sidebar({ view, onNavigate, providers, health, apiVersio
           <img src="/favicon.svg" alt="" width="32" height="32" />
           <div>
             <strong>SlotSync</strong>
-            <span>Bloom Wellness Studio</span>
+            <span>Bloom Wellness Studio · Open 7 am–9 pm</span>
           </div>
         </div>
 
