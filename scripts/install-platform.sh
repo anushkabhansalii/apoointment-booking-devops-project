@@ -18,7 +18,7 @@ if ! kubectl -n monitoring get secret grafana-admin >/dev/null 2>&1; then
   # Random admin password, generated in-cluster and never committed.
   kubectl -n monitoring create secret generic grafana-admin \
     --from-literal=admin-user=admin \
-    --from-literal=admin-password="$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 20)"
+    --from-literal=admin-password="$(openssl rand -hex 12)"
 fi
 helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
   -n monitoring -f "$ROOT/monitoring/kube-prometheus-stack-values.yaml" --wait --timeout 10m

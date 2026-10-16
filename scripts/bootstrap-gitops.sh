@@ -9,7 +9,7 @@ NS=slotsync
 kubectl apply -f "$ROOT/k8s/namespace.yaml"
 
 if ! kubectl -n "$NS" get secret slotsync-db >/dev/null 2>&1; then
-  PASSWORD="$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 24)"
+  PASSWORD="$(openssl rand -hex 16)"
   kubectl -n "$NS" create secret generic slotsync-db \
     --from-literal=POSTGRES_PASSWORD="$PASSWORD" \
     --from-literal=DATABASE_URL="postgresql+psycopg://slotsync:${PASSWORD}@slotsync-postgres:5432/slotsync"
