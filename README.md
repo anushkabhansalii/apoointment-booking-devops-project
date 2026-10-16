@@ -98,7 +98,7 @@ cluster forward. The pipeline never holds cluster credentials.
 | CI/CD | GitHub Actions, GitHub Container Registry (GHCR), multi-arch images (amd64 + arm64) |
 | Security | Trivy (image CVEs, SARIF to GitHub Security), Gitleaks (secrets), SBOM + provenance attestations, Pod Security "restricted", NetworkPolicy |
 | Infrastructure as Code | Terraform 1.6+, AWS provider 6, `terraform-aws-modules/vpc` and `/eks` |
-| Cloud | AWS VPC, NAT gateway, EKS 1.34, managed node group (t3.large), EBS CSI (gp3), EKS Pod Identity, NLB |
+| Cloud | AWS VPC, NAT gateway, EKS 1.35, managed node group (2× m7i-flex.large), EBS CSI (gp3), EKS Pod Identity, NLB |
 | Kubernetes | Helm 3/4 chart, Ingress (ingress-nginx), HPA, PDB, NetworkPolicy, StatefulSet + PVC, `helm test` |
 | GitOps | Argo CD (automated sync, prune, self-heal) |
 | Observability | Prometheus + Grafana (kube-prometheus-stack), ServiceMonitor, PrometheusRule alerts, dashboard-as-code |
@@ -322,11 +322,11 @@ AWS ap-south-1
     ├── public  subnets 10.20.0.0/20, 10.20.16.0/20   (2 AZs)  → NLB, NAT gateway   tag kubernetes.io/role/elb
     ├── private subnets 10.20.64.0/18, 10.20.128.0/18 (2 AZs)  → nodes, pods        tag kubernetes.io/role/internal-elb
     ├── Internet gateway + 1 NAT gateway (single_nat_gateway = true to save cost)
-    └── EKS "slotsync-demo" (Kubernetes 1.34, API logs to CloudWatch)
-        ├── managed node group "general": 2× t3.large (min 2 / max 4), AL2023, encrypted gp3 root volumes
+    └── EKS "slotsync-demo" (Kubernetes 1.35, API logs to CloudWatch, secrets encrypted with KMS)
+        ├── managed node group "general": 2× m7i-flex.large (2 vCPU / 8 GiB), AL2023, encrypted gp3 root volumes
         ├── add-ons: vpc-cni (NetworkPolicy on), coredns, kube-proxy, eks-pod-identity-agent,
         │            aws-ebs-csi-driver (IAM via Pod Identity — no static keys), metrics-server
-        └── access entries: the creator is cluster-admin
+        └── access entries: the creator is cluster-admin; public API endpoint limited to the operator's IP
 ```
 
 Files: `versions.tf` (pins), `providers.tf`, `variables.tf` (validated inputs), `vpc.tf`, `eks.tf`, `outputs.tf`,
@@ -338,7 +338,7 @@ cd terraform
 cp terraform.tfvars.example terraform.tfvars    # optional overrides (git-ignored)
 terraform init
 terraform plan -out tfplan
-terraform apply tfplan                          # ~15 minutes
+terraform apply tfplan                          # ~15 minutes, 61 resources
 $(terraform output -raw configure_kubectl)      # aws eks update-kubeconfig ...
 kubectl get nodes
 ```
@@ -460,8 +460,8 @@ scripts/teardown-eks.sh
 
 The order matters: the script deletes the Argo CD app, the workloads, ingress-nginx (which owns the **NLB**) and
 the PVCs (which own **EBS volumes**) *before* `terraform destroy`. Otherwise those AWS resources keep ENIs in the VPC
-and the destroy hangs. While running, the demo costs roughly **US$0.40/hour** (EKS control plane $0.10, 2× t3.large,
-NAT gateway, NLB).
+and the destroy hangs. While running, the demo costs roughly **US$0.35/hour** (EKS control plane $0.10, 2× m7i-flex.large,
+NAT gateway, NLB) — a few dollars for a full demo session.
 
 ## 16. Known issues and limitations
 

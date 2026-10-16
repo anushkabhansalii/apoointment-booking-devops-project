@@ -42,13 +42,13 @@ variable "single_nat_gateway" {
 variable "kubernetes_version" {
   description = "EKS Kubernetes version. Keep it in standard support to avoid extended-support charges."
   type        = string
-  default     = "1.34"
+  default     = "1.35"
 }
 
 variable "node_instance_types" {
   description = "EC2 instance types for the managed node group."
   type        = list(string)
-  default     = ["t3.large"]
+  default     = ["m7i-flex.large"]
 }
 
 variable "node_capacity_type" {
@@ -73,8 +73,9 @@ variable "node_desired_size" {
 }
 
 variable "node_max_size" {
-  type    = number
-  default = 4
+  description = "Upper bound for the node group. 2 nodes x 2 vCPU fits a new account's 5 vCPU on-demand quota."
+  type        = number
+  default     = 2
 }
 
 variable "node_disk_size" {
