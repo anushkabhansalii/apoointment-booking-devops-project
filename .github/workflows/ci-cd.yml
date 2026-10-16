@@ -1,0 +1,334 @@
+# SlotSync delivery pipeline
+#
+#   test ─┬─ backend-tests ──────┐
+#         ├─ migration-check ────┤
+#         ├─ frontend-build ─────┼─▶ build-scan-push (backend, frontend) ─▶ promote ─▶ Argo CD syncs EKS
+#         ├─ helm-validate ──────┤        Docker build → Trivy gate → GHCR :<git-sha>
+#         └─ terraform-validate ─┘
+#                                └─▶ helm-smoke-test (kind cluster: helm upgrade --install + helm test)
+#
+# Third-party actions are pinned to full commit SHAs (tags can be moved, SHAs can't).
+
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["**.md", "demo/**", "docs/**"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_OWNER: anushkabhansalii
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "20"
+
+jobs:
+  # ───────────────────────────── 1. TEST ─────────────────────────────
+  backend-tests:
+    name: Backend · lint + pytest
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+      - name: Ruff lint
+        run: ruff check --output-format=github .
+      - name: Ruff format check
+        run: ruff format --check .
+      - name: Pytest (a failing test fails the build)
+        run: pytest -v --junitxml=pytest-report.xml --cov=app --cov-report=term-missing --cov-report=xml --cov-fail-under=85
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: pytest-report
+          path: |
+            backend/pytest-report.xml
+            backend/coverage.xml
+
+  migration-check:
+    name: Backend · Alembic against PostgreSQL
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: slotsync
+          POSTGRES_USER: slotsync
+          POSTGRES_PASSWORD: ci-only-password
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U slotsync" --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://slotsync:ci-only-password@localhost:5432/slotsync
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+      - run: pip install -r requirements.txt
+      - name: Upgrade → downgrade → upgrade (migrations are reversible)
+        run: |
+          alembic upgrade head
+          alembic downgrade base
+          alembic upgrade head
+          alembic current
+      - name: Schema matches the SQLAlchemy models
+        run: alembic check
+
+  frontend-build:
+    name: Frontend · lint + build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run lint
+      - name: Vite production build
+        run: npm run build
+        env:
+          VITE_APP_VERSION: ${{ github.sha }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: frontend-dist
+          path: frontend/dist
+
+  helm-validate:
+    name: Helm · lint + render
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+      - name: Lint every values combination we deploy
+        run: |
+          helm lint helm/slotsync
+          helm lint helm/slotsync -f helm/slotsync/values-dev.yaml
+          helm lint helm/slotsync -f helm/slotsync/values-eks.yaml -f helm/slotsync/values-gitops.yaml
+      - name: Render manifests
+        run: helm template slotsync helm/slotsync -n slotsync -f helm/slotsync/values-eks.yaml > rendered.yaml && grep -c '^kind:' rendered.yaml
+
+  terraform-validate:
+    name: Terraform · fmt + validate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform
+    steps:
+      - uses: actions/checkout@v7
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+      - run: terraform fmt -check -recursive
+      - run: terraform init -backend=false -input=false
+      - run: terraform validate
+
+  # ───────────────────── 2. BUILD + SECURITY SCAN + PUSH ─────────────────────
+  build-scan-push:
+    name: Image · ${{ matrix.component }}
+    needs: [backend-tests, migration-check, frontend-build, helm-validate, terraform-validate]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write          # push to GHCR
+      security-events: write   # upload Trivy SARIF to the Security tab
+    strategy:
+      fail-fast: false
+      matrix:
+        component: [backend, frontend]
+    env:
+      IMAGE: ghcr.io/anushkabhansalii/slotsync-${{ matrix.component }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Image metadata (tag = Git commit SHA, never "latest")
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ env.IMAGE }}
+          flavor: latest=false
+          tags: |
+            type=sha,format=long,prefix=
+          labels: |
+            org.opencontainers.image.title=slotsync-${{ matrix.component }}
+
+      - name: Build image for scanning
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ${{ matrix.component }}
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: ${{ env.IMAGE }}:${{ github.sha }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: APP_VERSION=${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.component }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.component }}
+
+      - name: Trivy scan - full report (all severities, informational)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE }}:${{ github.sha }}
+          format: table
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          exit-code: "0"
+          output: trivy-${{ matrix.component }}.txt
+
+      - name: Trivy scan - SARIF for the GitHub Security tab
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE }}:${{ github.sha }}
+          format: sarif
+          severity: HIGH,CRITICAL
+          exit-code: "0"
+          output: trivy-${{ matrix.component }}.sarif
+          skip-setup-trivy: true
+
+      - name: Upload SARIF
+        if: always() && github.event_name == 'push'
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-${{ matrix.component }}.sarif
+          category: trivy-${{ matrix.component }}
+
+      - name: Trivy gate - fail on fixable HIGH/CRITICAL CVEs
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE }}:${{ github.sha }}
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          skip-setup-trivy: true
+
+      - name: Upload Trivy report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: trivy-${{ matrix.component }}
+          path: trivy-${{ matrix.component }}.*
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Only images that passed the Trivy gate get here. amd64 for EKS nodes,
+      # arm64 for Apple Silicon laptops / Graviton; the cache makes this fast.
+      - name: Push multi-arch image to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ${{ matrix.component }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: APP_VERSION=${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.component }}
+          provenance: mode=max
+          sbom: true
+
+      - name: Summary
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          echo "### slotsync-${{ matrix.component }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Pushed \`${IMAGE}:${GITHUB_SHA}\` after a clean Trivy gate." >> "$GITHUB_STEP_SUMMARY"
+
+  # ───────────── 2b. DEPLOY TEST: install the chart in a throwaway cluster ─────────────
+  helm-smoke-test:
+    name: Deploy · Helm on kind
+    needs: [backend-tests, frontend-build, helm-validate]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build images locally
+        run: |
+          docker build -t slotsync-backend:local backend
+          docker build -t slotsync-frontend:local frontend
+      - uses: helm/kind-action@1544676c07bb3570fcb70166beaa07c4528fd4aa # v1.15.1
+        with:
+          cluster_name: slotsync-ci
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+      - name: Load images into kind
+        run: kind load docker-image slotsync-backend:local slotsync-frontend:local --name slotsync-ci
+      - name: helm upgrade --install
+        run: |
+          kubectl apply -f k8s/namespace.yaml
+          helm upgrade --install slotsync helm/slotsync -n slotsync \
+            -f helm/slotsync/values-dev.yaml \
+            --set serviceMonitor.enabled=false,prometheusRule.enabled=false,grafanaDashboard.enabled=false \
+            --set ingress.enabled=false \
+            --wait --timeout 6m
+      - name: helm test
+        run: helm test slotsync -n slotsync --logs
+      - name: Show workload
+        if: always()
+        run: |
+          kubectl get pods,svc,hpa,pdb -n slotsync -o wide
+          kubectl get events -n slotsync --sort-by=.lastTimestamp | tail -30
+
+  # ───────────────────────────── 3. DEPLOY (GitOps) ─────────────────────────────
+  # Write the new image tag into Git. Argo CD notices the commit and rolls the
+  # EKS cluster forward - the pipeline never needs cluster credentials.
+  promote:
+    name: Promote · values-gitops.yaml
+    needs: [build-scan-push, helm-smoke-test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: promote
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+      - name: Point the GitOps values at this commit's images
+        run: |
+          sed -i -E "s/^(  imageTag: ).*/\1\"${GITHUB_SHA}\"/" helm/slotsync/values-gitops.yaml
+          git diff --stat
+          cat helm/slotsync/values-gitops.yaml
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add helm/slotsync/values-gitops.yaml
+          if git diff --cached --quiet; then echo "Already promoted"; exit 0; fi
+          git commit -m "chore(gitops): promote slotsync ${GITHUB_SHA::7} [skip ci]"
+          for i in 1 2 3; do git pull --rebase origin main && git push origin HEAD:main && break; sleep 5; done
+          echo "Promoted \`${GITHUB_SHA}\` - Argo CD will sync it." >> "$GITHUB_STEP_SUMMARY"
