@@ -35,6 +35,15 @@ grafana:
     userKey: admin-user
     passwordKey: admin-password
   defaultDashboardsTimezone: browser
+  # Grafana is only reachable through kubectl port-forward (ClusterIP), so
+  # dashboards are viewable read-only without logging in; editing still
+  # requires the admin password from the grafana-admin Secret.
+  grafana.ini:
+    auth.anonymous:
+      enabled: true
+      org_role: Viewer
+    dashboards:
+      default_home_dashboard_path: /tmp/dashboards/slotsync.json
   sidecar:
     dashboards:
       enabled: true

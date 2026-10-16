@@ -4,6 +4,11 @@ configs:
     server.insecure: true          # TLS is terminated by port-forward/ingress in this demo
   cm:
     timeout.reconciliation: 60s    # poll Git every minute
+    # Read-only view of applications without logging in (the UI is only
+    # reachable via port-forward). Changes still need the admin password.
+    users.anonymous.enabled: "true"
+  rbac:
+    policy.default: role:readonly
     # A brand-new HPA reports "unable to fetch metrics" for its first minute;
     # treat that as Progressing instead of Degraded.
     resource.customizations.health.autoscaling_HorizontalPodAutoscaler: |

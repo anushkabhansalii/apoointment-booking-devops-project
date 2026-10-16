@@ -7,7 +7,7 @@ metadata:
   name: slotsync
   namespace: argocd
   finalizers:
-    - resources-finalizer.argocd.argoproj.io   # deleting the app deletes its resources
+    - resources-finalizer.argocd.argoproj.io/background   # deleting the app deletes its resources
 spec:
   project: default
   source:
