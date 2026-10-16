@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.catalog import SERVICES
+from app.config import settings
 from app.database import get_db
 from app.models import Provider
 from app.schemas import ProviderOut, ServiceOut
@@ -15,6 +16,12 @@ router = APIRouter(prefix="/api", tags=["catalog"])
 @router.get("/providers", response_model=list[ProviderOut])
 def list_providers(db: Session = Depends(get_db)):
     return db.scalars(select(Provider).where(Provider.active.is_(True)).order_by(Provider.name)).all()
+
+
+@router.get("/version")
+def version():
+    """Build the API is running: lets the UI show which commit each tier came from."""
+    return {"version": settings.app_version, "environment": settings.environment}
 
 
 @router.get("/services", response_model=list[ServiceOut])

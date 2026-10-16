@@ -23,6 +23,7 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [providers, setProviders] = useState([]);
   const [services, setServices] = useState([]);
+  const [apiVersion, setApiVersion] = useState(null);
   const [stats, setStats] = useState(null);
   const [dayAppointments, setDayAppointments] = useState([]);
   const [todayAppointments, setTodayAppointments] = useState([]);
@@ -62,10 +63,11 @@ export default function App() {
   }, [day, filters]);
 
   useEffect(() => {
-    Promise.all([api.providers(), api.services()])
-      .then(([p, s]) => {
+    Promise.all([api.providers(), api.services(), api.version()])
+      .then(([p, s, v]) => {
         setProviders(p);
         setServices(s);
+        setApiVersion(v.version);
       })
       .catch((err) => setLoadError(err.message));
   }, []);
@@ -123,6 +125,7 @@ export default function App() {
         onNavigate={setView}
         providers={providers}
         health={health}
+        apiVersion={apiVersion}
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
       />

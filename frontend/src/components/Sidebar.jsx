@@ -6,7 +6,7 @@ const NAV = [
   { id: "appointments", label: "Appointments", icon: "list" },
 ];
 
-export default function Sidebar({ view, onNavigate, providers, health, open, onClose }) {
+export default function Sidebar({ view, onNavigate, providers, health, apiVersion, open, onClose }) {
   return (
     <>
       <div className={`scrim ${open ? "show" : ""}`} onClick={onClose} />
@@ -59,10 +59,10 @@ export default function Sidebar({ view, onNavigate, providers, health, open, onC
             <span className={`dot ${health}`} />
             <span>{health === "up" ? "API healthy" : health === "down" ? "API unreachable" : "Checking API…"}</span>
           </div>
-          <div className="pipeline-row muted">
+          <div className="pipeline-row muted" title="Git commit each tier was built from">
             <Icon name="gitCommit" size={14} />
             <span>
-              build <code>{__APP_VERSION__.slice(0, 7)}</code>
+              ui <code>{__APP_VERSION__.slice(0, 7)}</code> · api <code>{(apiVersion ?? "…").slice(0, 7)}</code>
             </span>
           </div>
           <div className="pipeline-steps" aria-label="Delivery pipeline">

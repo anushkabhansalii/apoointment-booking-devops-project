@@ -49,6 +49,7 @@ export const api = {
   stats: () => request("/api/appointments/stats"),
   providers: () => request("/api/providers"),
   services: () => request("/api/services"),
+  version: () => request("/api/version"),
   create: (payload) => request("/api/appointments", { method: "POST", body: payload }),
   update: (id, payload) => request(`/api/appointments/${id}`, { method: "PUT", body: payload }),
   setStatus: (id, status) => request(`/api/appointments/${id}/status`, { method: "PATCH", body: { status } }),
