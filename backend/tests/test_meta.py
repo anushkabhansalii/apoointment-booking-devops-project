@@ -32,3 +32,11 @@ def test_openapi_lists_crud_routes(client):
     paths = client.get("/openapi.json").json()["paths"]
     assert {"get", "post"} <= paths["/api/appointments"].keys()
     assert {"get", "put", "delete"} <= paths["/api/appointments/{appointment_id}"].keys()
+
+
+def test_wait_for_db_succeeds_and_times_out():
+    from app.wait_for_db import wait
+
+    assert wait("sqlite+pysqlite:///:memory:", timeout=1) is True
+    # Nothing listens on port 1, so this must give up after the timeout.
+    assert wait("postgresql+psycopg://u:p@127.0.0.1:1/none", timeout=0.1, interval=0.05) is False
