@@ -1,6 +1,6 @@
 # Written by the CI pipeline's "promote" job after every green build on main.
 # Argo CD watches this file: a new commit here is a new deployment.
 global:
-  imageTag: "e07706fad354aa9aca773167b338b2f3f7d96ada"
+  imageTag: "0e61edcd2469d9471c5778a93e80981e2b157390"
 database:
   existingSecret: slotsync-db
