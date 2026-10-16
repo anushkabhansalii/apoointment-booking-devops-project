@@ -1,0 +1,15 @@
+# EKS only: encrypted gp3 EBS volumes provisioned by the EBS CSI driver
+# (installed as an EKS add-on by Terraform). Used by the PostgreSQL PVC.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: ebs.csi.aws.com
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+reclaimPolicy: Delete
+parameters:
+  type: gp3
+  encrypted: "true"

@@ -1,0 +1,11 @@
+# Application namespace. Pod Security Admission "restricted" is enforced:
+# every SlotSync pod runs as non-root with a read-only root filesystem.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: slotsync
+  labels:
+    app.kubernetes.io/part-of: slotsync
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/warn: restricted
