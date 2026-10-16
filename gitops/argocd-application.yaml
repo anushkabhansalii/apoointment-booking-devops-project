@@ -1,0 +1,43 @@
+# Argo CD Application: keeps the slotsync namespace on EKS in sync with the
+# Helm chart in this repository. CI never touches the cluster - it commits the
+# new image SHA to values-gitops.yaml and Argo CD rolls it out.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: slotsync
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io   # deleting the app deletes its resources
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/anushkabhansalii/apoointment-booking-devops-project.git
+    targetRevision: main
+    path: helm/slotsync
+    helm:
+      releaseName: slotsync
+      valueFiles:
+        - values.yaml
+        - values-eks.yaml
+        - values-gitops.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: slotsync
+  syncPolicy:
+    automated:
+      prune: true      # remove resources deleted from Git
+      selfHeal: true   # undo manual kubectl edits (drift)
+    syncOptions:
+      - CreateNamespace=false     # created by k8s/namespace.yaml with Pod Security labels
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff: { duration: 10s, factor: 2, maxDuration: 3m }
+  ignoreDifferences:
+    # The API server fills in defaults on volumeClaimTemplates; don't report that as drift.
+    - group: apps
+      kind: StatefulSet
+      jqPathExpressions:
+        - .spec.volumeClaimTemplates[]?.status
+        - .spec.volumeClaimTemplates[]?.metadata.creationTimestamp
+  revisionHistoryLimit: 10

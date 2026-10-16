@@ -1,0 +1,34 @@
+# Values for argo/argo-cd (installed by scripts/install-platform.sh).
+configs:
+  params:
+    server.insecure: true          # TLS is terminated by port-forward/ingress in this demo
+  cm:
+    timeout.reconciliation: 60s    # poll Git every minute
+    # A brand-new HPA reports "unable to fetch metrics" for its first minute;
+    # treat that as Progressing instead of Degraded.
+    resource.customizations.health.autoscaling_HorizontalPodAutoscaler: |
+      hs = {}
+      hs.status = "Healthy"
+      hs.message = "HPA is active"
+      if obj.status ~= nil and obj.status.conditions ~= nil then
+        for _, c in ipairs(obj.status.conditions) do
+          if c.type == "ScalingActive" and c.status == "False" then
+            hs.status = "Progressing"
+            hs.message = c.message
+          end
+        end
+      end
+      return hs
+dex:
+  enabled: false
+notifications:
+  enabled: false
+server:
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+repoServer:
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+controller:
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
