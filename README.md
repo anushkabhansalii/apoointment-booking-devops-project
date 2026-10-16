@@ -39,6 +39,10 @@ Grafana watching it.
 
 ## 1. Architecture
 
+![SlotSync architecture](docs/architecture.png)
+
+<details><summary>Same diagram as Mermaid (renders on GitHub)</summary>
+
 ```mermaid
 flowchart LR
     dev([Developer]) -->|git push| gh[(GitHub<br/>main)]
@@ -77,6 +81,8 @@ flowchart LR
     EKS -->|pull images| ghcr
     user([Studio staff]) --> nlb
 ```
+
+</details>
 
 **Request path:** browser → AWS NLB → ingress-nginx → `/` frontend Service (Nginx serving the React build) or
 `/api` backend Service (FastAPI) → PostgreSQL. The browser only ever calls relative `/api/...` URLs, so the same

@@ -1,0 +1,108 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>
+*{box-sizing:border-box}
+body{margin:0;width:1920px;height:1080px;background:#ffffff;font-family:-apple-system,"Segoe UI",Calibri,Arial,sans-serif;color:#0f172a;position:relative;overflow:hidden}
+.box{position:absolute;border-radius:16px;padding:14px 18px}
+.lbl{font-size:15px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.node{position:absolute;background:#fff;border:2px solid #c7d2fe;border-radius:14px;padding:12px 14px;box-shadow:0 4px 14px rgba(15,23,42,.08);font-size:19px;line-height:1.25}
+.node b{display:block;font-size:21px}
+.node small{color:#475569;font-size:16px}
+.dark{background:#0f172a;color:#e2e8f0;border-color:#0f172a}
+.dark small{color:#94a3b8}
+.mint{border-color:#6ee7b7}
+.amber{border-color:#fcd34d}
+.pink{border-color:#f9a8d4}
+svg{position:absolute;left:0;top:0}
+.tag{position:absolute;font-size:16px;color:#475569;background:#fff;padding:2px 8px;border-radius:8px}
+</style></head><body>
+
+<!-- Zones -->
+<div class="box" style="left:30px;top:40px;width:560px;height:1000px;background:#f8fafc;border:2px dashed #cbd5e1">
+  <div class="lbl" style="color:#64748b">Developer &amp; CI/CD — GitHub</div>
+</div>
+<div class="box" style="left:630px;top:40px;width:1260px;height:1000px;background:#fff7ed;border:2px solid #fdba74">
+  <div class="lbl" style="color:#c2410c">AWS · ap-south-1 · provisioned by Terraform</div>
+</div>
+<div class="box" style="left:660px;top:95px;width:1200px;height:920px;background:#fffbeb;border:2px dashed #fcd34d">
+  <div class="lbl" style="color:#b45309">VPC 10.20.0.0/16 · 2 public + 2 private subnets · NAT gateway</div>
+</div>
+<div class="box" style="left:690px;top:240px;width:1140px;height:750px;background:#eef2ff;border:2px solid #a5b4fc">
+  <div class="lbl" style="color:#4338ca">EKS 1.35 · 2× m7i-flex.large</div>
+</div>
+
+<!-- GitHub side -->
+<div class="node dark" style="left:60px;top:100px;width:220px"><b>Developer</b><small>git push → main</small></div>
+<div class="node" style="left:330px;top:100px;width:230px"><b>GitHub repo</b><small>app · Helm · Terraform</small></div>
+
+<div class="node" style="left:60px;top:240px;width:500px">
+  <b>GitHub Actions — tests &amp; gates</b>
+  <small>Gitleaks · Ruff + pytest (32) · Alembic on Postgres · ESLint + Vite build · helm lint · terraform validate</small>
+</div>
+<div class="node amber" style="left:60px;top:400px;width:500px">
+  <b>Build → Trivy gate → Push</b>
+  <small>backend + frontend images · fail on HIGH/CRITICAL · SBOM + provenance</small>
+</div>
+<div class="node mint" style="left:60px;top:550px;width:240px"><b>GHCR</b><small>:&lt;git-sha&gt; tags<br>amd64 + arm64</small></div>
+<div class="node" style="left:320px;top:550px;width:240px"><b>kind smoke test</b><small>helm install<br>+ helm test</small></div>
+<div class="node pink" style="left:60px;top:720px;width:500px">
+  <b>Promote (GitOps)</b>
+  <small>bot commits the SHA to helm/slotsync/values-gitops.yaml</small>
+</div>
+<div class="node" style="left:60px;top:880px;width:500px;border-style:dashed">
+  <b>No cluster credentials in CI</b>
+  <small>Argo CD pulls from Git; the pipeline never runs kubectl</small>
+</div>
+
+<!-- AWS side -->
+<div class="node dark" style="left:700px;top:140px;width:200px"><b>Studio staff</b><small>browser</small></div>
+<div class="node amber" style="left:960px;top:140px;width:300px"><b>AWS Network LB</b><small>public subnets</small></div>
+<div class="node" style="left:1320px;top:140px;width:250px"><b>NAT gateway</b><small>egress for nodes</small></div>
+
+<div class="node" style="left:960px;top:300px;width:300px"><b>ingress-nginx</b><small>/ → frontend · /api → backend</small></div>
+
+<div class="node" style="left:720px;top:470px;width:260px"><b>frontend ×2</b><small>React build on Nginx<br>non-root · read-only FS</small></div>
+<div class="node" style="left:1040px;top:470px;width:280px"><b>backend ×2 → 8</b><small>FastAPI · HPA on CPU<br>/health /ready /metrics</small></div>
+<div class="node" style="left:1040px;top:660px;width:280px"><b>PostgreSQL</b><small>StatefulSet · gp3 EBS PVC<br>NetworkPolicy: backend only</small></div>
+
+<div class="node pink" style="left:1420px;top:300px;width:380px"><b>Argo CD</b><small>auto-sync · prune · self-heal<br>watches values-gitops.yaml</small></div>
+<div class="node mint" style="left:1420px;top:520px;width:380px"><b>Prometheus</b><small>ServiceMonitor scrapes /metrics every 15 s<br>alerts: down · 5xx · p95 latency</small></div>
+<div class="node mint" style="left:1420px;top:720px;width:380px"><b>Grafana</b><small>"SlotSync / API overview" — 19 panels</small></div>
+
+<div class="node" style="left:720px;top:860px;width:600px;background:#f8fafc"><b>Add-ons via Terraform</b><small>vpc-cni (NetworkPolicy) · coredns · kube-proxy · EBS CSI (Pod Identity) · metrics-server</small></div>
+
+<svg width="1920" height="1080">
+<defs>
+ <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0L10,5L0,10z" fill="#475569"/></marker>
+ <marker id="p" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0L10,5L0,10z" fill="#db2777"/></marker>
+ <marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0L10,5L0,10z" fill="#059669"/></marker>
+</defs>
+<g stroke="#475569" stroke-width="3" fill="none" marker-end="url(#a)">
+ <path d="M280 135 H322"/>
+ <path d="M445 175 V232"/>
+ <path d="M310 335 V392"/>
+ <path d="M180 495 V542"/>
+ <path d="M440 495 V542"/>
+ <path d="M180 640 V712"/>
+ <path d="M440 640 L440 690 L350 712"/>
+ <path d="M900 175 H952"/>
+ <path d="M1110 222 V292"/>
+ <path d="M1030 385 L880 462"/>
+ <path d="M1150 385 V462"/>
+ <path d="M980 540 H1032"/>
+ <path d="M1180 580 V652"/>
+</g>
+<!-- Argo CD watches git -->
+<path d="M560 760 H 620 L 640 815 H 1380 V 350 H 1412" stroke="#db2777" stroke-width="3" stroke-dasharray="10 7" fill="none" marker-end="url(#p)"/>
+<path d="M1500 395 C 1430 430, 1380 470, 1330 500" stroke="#db2777" stroke-width="3" fill="none" marker-end="url(#p)"/>
+<!-- pull images -->
+<path d="M300 670 H 600 C 650 670, 670 545, 712 540" stroke="#059669" stroke-width="3" stroke-dasharray="10 7" fill="none" marker-end="url(#g)"/>
+<path d="M300 650 V 670" stroke="#059669" stroke-width="3" stroke-dasharray="6 5" fill="none"/>
+<!-- scrape -->
+<path d="M1412 575 H1328" stroke="#059669" stroke-width="3" fill="none" marker-end="url(#g)"/>
+<path d="M1610 715 V632" stroke="#059669" stroke-width="3" fill="none" marker-end="url(#g)"/>
+</svg>
+<div class="tag" style="left:1120px;top:788px;color:#be185d;font-weight:600">Argo CD watches Git</div>
+<div class="tag" style="left:1398px;top:440px;color:#be185d;font-weight:600">sync</div>
+<div class="tag" style="left:470px;top:680px;color:#047857;font-weight:600">pull images</div>
+<div class="tag" style="left:1336px;top:542px;color:#047857;font-weight:600">scrape</div>
+</body></html>
