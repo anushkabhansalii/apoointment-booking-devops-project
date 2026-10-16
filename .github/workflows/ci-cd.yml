@@ -1,6 +1,7 @@
 # SlotSync delivery pipeline
 #
-#   test ─┬─ backend-tests ──────┐
+#   test ─┬─ secret-scan ────────┐
+#         ├─ backend-tests ──────┤
 #         ├─ migration-check ────┤
 #         ├─ frontend-build ─────┼─▶ build-scan-push (backend, frontend) ─▶ promote ─▶ Argo CD syncs EKS
 #         ├─ helm-validate ──────┤        Docker build → Trivy gate → GHCR :<git-sha>
@@ -34,6 +35,18 @@ env:
 
 jobs:
   # ───────────────────────────── 1. TEST ─────────────────────────────
+  secret-scan:
+    name: Security · Gitleaks secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0   # scan the whole history, not just the last commit
+      - name: Gitleaks (fails if any credential is committed)
+        run: |
+          docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1 \
+            git /repo --no-banner --redact --verbose
+
   backend-tests:
     name: Backend · lint + pytest
     runs-on: ubuntu-latest
@@ -153,7 +166,7 @@ jobs:
   # ───────────────────── 2. BUILD + SECURITY SCAN + PUSH ─────────────────────
   build-scan-push:
     name: Image · ${{ matrix.component }}
-    needs: [backend-tests, migration-check, frontend-build, helm-validate, terraform-validate]
+    needs: [secret-scan, backend-tests, migration-check, frontend-build, helm-validate, terraform-validate]
     runs-on: ubuntu-latest
     permissions:
       contents: read
