@@ -1,0 +1,17 @@
+# Values for kubernetes/ingress-nginx on EKS: one internet-facing AWS Network
+# Load Balancer in the public subnets in front of the NGINX controller.
+controller:
+  replicaCount: 2
+  service:
+    type: LoadBalancer
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-type: nlb
+      service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      additionalLabels:
+        release: kube-prometheus-stack
+  resources:
+    requests: { cpu: 50m, memory: 96Mi }
