@@ -1,0 +1,21 @@
+{{- if and .Values.networkPolicy.enabled .Values.postgres.enabled }}
+# Only pods that carry slotsync/db-access=true (the backend) may reach PostgreSQL.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "slotsync.fullname" . }}-postgres
+  labels:
+    {{- include "slotsync.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "slotsync.selectorLabels" (dict "ctx" . "component" "postgres") | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              slotsync/db-access: "true"
+      ports:
+        - { protocol: TCP, port: 5432 }
+{{- end }}

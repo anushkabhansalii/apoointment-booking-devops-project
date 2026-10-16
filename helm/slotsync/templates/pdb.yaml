@@ -1,0 +1,16 @@
+{{- range $name := list "backend" "frontend" }}
+{{- $cfg := index $.Values $name }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "slotsync.fullname" $ }}-{{ $name }}
+  labels:
+    {{- include "slotsync.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $name }}
+spec:
+  minAvailable: {{ $cfg.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "slotsync.selectorLabels" (dict "ctx" $ "component" $name) | nindent 6 }}
+{{- end }}

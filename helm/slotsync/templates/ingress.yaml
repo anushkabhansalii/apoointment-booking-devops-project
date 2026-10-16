@@ -1,0 +1,52 @@
+{{- if .Values.ingress.enabled }}
+{{- $fullname := include "slotsync.fullname" . -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "slotsync.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- with .Values.ingress.tls }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    - {{- with .Values.ingress.host }}
+      host: {{ . | quote }}
+      {{- end }}
+      http:
+        paths:
+          # /api/* -> FastAPI. Longest prefix wins, so this beats "/".
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $fullname }}-backend
+                port: { name: http }
+          # Swagger UI for the demo.
+          - path: /docs
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $fullname }}-backend
+                port: { name: http }
+          - path: /openapi.json
+            pathType: Exact
+            backend:
+              service:
+                name: {{ $fullname }}-backend
+                port: { name: http }
+          # Everything else -> React app served by Nginx.
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $fullname }}-frontend
+                port: { name: http }
+{{- end }}
