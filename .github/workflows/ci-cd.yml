@@ -168,6 +168,7 @@ jobs:
     name: Image · ${{ matrix.component }}
     needs: [secret-scan, backend-tests, migration-check, frontend-build, helm-validate, terraform-validate]
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
       packages: write          # push to GHCR
@@ -285,6 +286,7 @@ jobs:
     name: Deploy · Helm on kind
     needs: [backend-tests, frontend-build, helm-validate]
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1

@@ -1,6 +1,9 @@
 # syntax=docker/dockerfile:1.7
 # ---------- stage 1: build the static React bundle with Node ----------
-FROM node:20-alpine AS build
+# The bundle is plain HTML/JS/CSS, identical for every CPU architecture, so it is
+# built once on the native build platform; only the Nginx stage is per-arch.
+# (Running npm under QEMU emulation for arm64 is slow and can hang.)
+FROM --platform=$BUILDPLATFORM node:20-alpine AS build
 WORKDIR /app
 
 COPY package.json package-lock.json ./
