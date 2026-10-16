@@ -30,7 +30,7 @@ terraform/.terraform/
 !*.tfvars.example
 crash.log
 *.tfplan
-tfplan
+tfplan*
 
 # Kubernetes / Helm
 kubeconfig*
