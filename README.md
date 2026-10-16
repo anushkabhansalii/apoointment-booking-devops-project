@@ -505,5 +505,7 @@ NAT gateway, NLB) — a few dollars for a full demo session.
 
 ---
 
-*The demo video's narration is synthesized (macOS text-to-speech) over real recordings of this project running;
-[`demo/VIDEO-SCRIPT.md`](demo/VIDEO-SCRIPT.md) has the script and shot list for re-recording it live.*
+*The demo video is a real screen recording of this project: Terminal and Chrome on the developer's Mac while
+`docker compose`, `pytest`, `terraform`, `kubectl`, `helm`, GitHub Actions, Argo CD, Prometheus and Grafana ran for
+real. Long waits (terraform apply, the pipeline run) are sped up and labelled. [`demo/VIDEO-SCRIPT.md`](demo/VIDEO-SCRIPT.md)
+lists the scenes.*
