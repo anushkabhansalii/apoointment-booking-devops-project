@@ -25,8 +25,8 @@ helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheu
 
 echo "==> Ingress controller"
 if [ "$TARGET" = "minikube" ]; then
-  minikube addons enable ingress
-  minikube addons enable metrics-server
+  minikube -p "${MINIKUBE_PROFILE:-slotsync}" addons enable ingress
+  minikube -p "${MINIKUBE_PROFILE:-slotsync}" addons enable metrics-server
 else
   helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
     -n ingress-nginx --create-namespace -f "$ROOT/monitoring/ingress-nginx-values.yaml" --wait --timeout 10m
