@@ -1,0 +1,13 @@
+# AWS EKS: EBS-backed storage, metrics and dashboards on.
+postgres:
+  persistence:
+    storageClass: gp3
+backend:
+  autoscaling:
+    maxReplicas: 8
+serviceMonitor:
+  enabled: true
+prometheusRule:
+  enabled: true
+grafanaDashboard:
+  enabled: true

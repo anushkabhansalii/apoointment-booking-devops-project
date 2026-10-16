@@ -1,0 +1,31 @@
+# `helm test <release>` - checks the API is healthy through its Service.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "slotsync.fullname" . }}-test-api
+  labels:
+    {{- include "slotsync.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  restartPolicy: Never
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65534
+    seccompProfile: { type: RuntimeDefault }
+  containers:
+    - name: check
+      image: busybox:1.37
+      command: ["sh", "-c"]
+      args:
+        - |
+          set -e
+          wget -qO- http://{{ include "slotsync.fullname" . }}-backend:{{ .Values.backend.port }}/ready
+          echo
+          wget -qO- http://{{ include "slotsync.fullname" . }}-frontend/healthz
+          wget -qO- http://{{ include "slotsync.fullname" . }}-frontend/api/providers | grep -q specialty
+          echo "frontend -> backend proxy OK"
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities: { drop: [ALL] }

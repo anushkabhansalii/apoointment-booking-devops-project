@@ -1,0 +1,110 @@
+# Default values for the SlotSync chart.
+# Environment-specific overrides live in values-dev.yaml (minikube),
+# values-eks.yaml (AWS) and values-gitops.yaml (image tags written by CI).
+
+global:
+  # Image registry and owner; images are <registry>/<owner>/slotsync-<component>:<tag>
+  imageRegistry: ghcr.io/anushkabhansalii
+  # Git commit SHA of the build to run. CI writes this into values-gitops.yaml.
+  imageTag: ""
+  imagePullSecrets: []
+
+backend:
+  image:
+    repository: slotsync-backend
+    tag: ""            # falls back to global.imageTag, then Chart.appVersion
+    pullPolicy: IfNotPresent
+  replicaCount: 2
+  port: 8000
+  env:
+    APP_ENV: kubernetes
+    STUDIO_TZ: Asia/Kolkata
+    OPENING_HOUR: "7"
+    CLOSING_HOUR: "21"
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits: { cpu: 500m, memory: 384Mi }
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 60
+  pdb:
+    minAvailable: 1
+
+frontend:
+  image:
+    repository: slotsync-frontend
+    tag: ""
+    pullPolicy: IfNotPresent
+  replicaCount: 2
+  port: 8080
+  resources:
+    requests: { cpu: 25m, memory: 32Mi }
+    limits: { cpu: 200m, memory: 128Mi }
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 70
+  pdb:
+    minAvailable: 1
+
+postgres:
+  # In-cluster PostgreSQL for the demo. For production point the backend at
+  # Amazon RDS instead (set enabled=false and database.externalUrl).
+  enabled: true
+  image: postgres:16-alpine
+  database: slotsync
+  username: slotsync
+  persistence:
+    size: 2Gi
+    storageClass: ""   # "" = cluster default
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits: { cpu: 500m, memory: 512Mi }
+
+database:
+  # Name of an existing Secret holding keys POSTGRES_PASSWORD and DATABASE_URL.
+  # Leave empty to let the chart create one with a random password that is
+  # kept across upgrades.
+  existingSecret: ""
+  # Used only when postgres.enabled=false.
+  externalUrl: ""
+
+ingress:
+  enabled: true
+  className: nginx
+  host: ""             # "" = match any host (e.g. the AWS load balancer DNS name)
+  annotations: {}
+  tls: []
+
+serviceMonitor:
+  enabled: false       # needs the Prometheus Operator CRDs (kube-prometheus-stack)
+  interval: 15s
+  labels:
+    release: kube-prometheus-stack
+
+prometheusRule:
+  enabled: false
+  labels:
+    release: kube-prometheus-stack
+
+grafanaDashboard:
+  enabled: false
+  labels:
+    grafana_dashboard: "1"
+
+networkPolicy:
+  enabled: true
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: [ALL]

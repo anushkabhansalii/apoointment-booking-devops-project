@@ -1,0 +1,83 @@
+{{- $component := dict "ctx" . "component" "frontend" -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "slotsync.fullname" . }}-frontend
+  labels:
+    {{- include "slotsync.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/version: {{ include "slotsync.tag" (dict "image" .Values.frontend.image "ctx" .) | quote }}
+spec:
+  {{- if not .Values.frontend.autoscaling.enabled }}
+  replicas: {{ .Values.frontend.replicaCount }}
+  {{- end }}
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  selector:
+    matchLabels:
+      {{- include "slotsync.selectorLabels" $component | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "slotsync.selectorLabels" $component | nindent 8 }}
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+        runAsUser: 101
+        runAsGroup: 101
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "slotsync.selectorLabels" $component | nindent 14 }}
+      containers:
+        - name: frontend
+          image: {{ include "slotsync.image" (dict "image" .Values.frontend.image "ctx" .) }}
+          imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.frontend.port }}
+          env:
+            - name: BACKEND_URL
+              value: http://{{ include "slotsync.fullname" . }}-backend:{{ .Values.backend.port }}
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 15
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.frontend.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          # Read-only root filesystem: Nginx writes its pid/cache to /tmp and
+          # renders its config template into conf.d at start-up.
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+            - { name: nginx-conf, mountPath: /etc/nginx/conf.d }
+      volumes:
+        - { name: tmp, emptyDir: {} }
+        - { name: nginx-conf, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "slotsync.fullname" . }}-frontend
+  labels:
+    {{- include "slotsync.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "slotsync.selectorLabels" $component | nindent 4 }}
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

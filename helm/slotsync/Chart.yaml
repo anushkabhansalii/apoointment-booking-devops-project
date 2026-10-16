@@ -1,0 +1,12 @@
+apiVersion: v2
+name: slotsync
+description: SlotSync appointment booking platform - React frontend, FastAPI backend and PostgreSQL
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords: [appointments, booking, fastapi, react, postgresql]
+home: https://github.com/anushkabhansalii/apoointment-booking-devops-project
+sources:
+  - https://github.com/anushkabhansalii/apoointment-booking-devops-project
+maintainers:
+  - name: Anushka Jain

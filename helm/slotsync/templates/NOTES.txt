@@ -1,0 +1,18 @@
+SlotSync {{ include "slotsync.tag" (dict "image" .Values.backend.image "ctx" .) }} is deployed to namespace {{ .Release.Namespace }}.
+
+  kubectl get pods,svc,ingress,hpa -n {{ .Release.Namespace }}
+  helm test {{ .Release.Name }} -n {{ .Release.Namespace }}
+
+{{- if .Values.ingress.enabled }}
+{{- if .Values.ingress.host }}
+
+Open http://{{ .Values.ingress.host }}  (API docs: http://{{ .Values.ingress.host }}/docs)
+{{- else }}
+
+Find the address with:
+  kubectl get ingress {{ include "slotsync.fullname" . }} -n {{ .Release.Namespace }}
+{{- end }}
+{{- end }}
+
+Without an ingress controller:
+  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "slotsync.fullname" . }}-frontend 3000:80

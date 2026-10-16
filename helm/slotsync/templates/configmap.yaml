@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "slotsync.fullname" . }}-backend
+  labels:
+    {{- include "slotsync.labels" . | nindent 4 }}
+data:
+  {{- range $key, $value := .Values.backend.env }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+  APP_VERSION: {{ include "slotsync.tag" (dict "image" .Values.backend.image "ctx" .) | quote }}
+  {{- with .Values.ingress.host }}
+  CORS_ORIGINS: {{ printf "http://%s,https://%s" . . | quote }}
+  {{- end }}

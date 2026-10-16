@@ -1,0 +1,6 @@
+# Written by the CI pipeline's "promote" job after every green build on main.
+# Argo CD watches this file: a new commit here is a new deployment.
+global:
+  imageTag: "latest-placeholder"
+database:
+  existingSecret: slotsync-db

@@ -1,0 +1,16 @@
+# Local cluster (minikube / kind): images built locally, ingress on slotsync.local
+global:
+  imageRegistry: ""
+  imageTag: local
+backend:
+  image: { pullPolicy: Never }
+frontend:
+  image: { pullPolicy: Never }
+ingress:
+  host: slotsync.local
+serviceMonitor:
+  enabled: true
+prometheusRule:
+  enabled: true
+grafanaDashboard:
+  enabled: true
