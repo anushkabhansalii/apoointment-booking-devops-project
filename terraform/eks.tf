@@ -42,8 +42,14 @@ module "eks" {
     eks-pod-identity-agent = {
       before_compute = true
     }
-    kube-proxy = {}
-    coredns    = {}
+    # kube-proxy must exist before CoreDNS, metrics-server and the EBS CSI driver
+    # can become healthy, so create it with the networking add-ons. Otherwise a
+    # low -parallelism can deadlock: those three wait for health while holding
+    # every slot, and kube-proxy never starts.
+    kube-proxy = {
+      before_compute = true
+    }
+    coredns = {}
     # Dynamic EBS volumes for the PostgreSQL PersistentVolumeClaim.
     aws-ebs-csi-driver = {
       pod_identity_association = [{
